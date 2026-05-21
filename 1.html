@@ -1,0 +1,605 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title></title>
+  <meta name="Generator" content="Cocoa HTML Writer">
+  <meta name="CocoaVersion" content="2575.7">
+  <style type="text/css">
+    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 16.0px 'Helvetica Neue'; -webkit-text-stroke: #000000}
+    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 16.0px 'Helvetica Neue'; -webkit-text-stroke: #000000; min-height: 18.0px}
+    span.s1 {font-kerning: none}
+  </style>
+</head>
+<body>
+<p class="p1"><span class="s1">&lt;!DOCTYPE html&gt;</span></p>
+<p class="p1"><span class="s1">&lt;html lang="zh-CN"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;head&gt;</span></p>
+<p class="p1"><span class="s1">&lt;meta charset="UTF-8"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;title&gt;团队协同计划表 - 实时同步版&lt;/title&gt;</span></p>
+<p class="p1"><span class="s1">&lt;script src="https://cdn.tailwindcss.com"&gt;&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1">&lt;!-- Firebase SDK (ES模块版本) --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;script type="module"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const firebaseConfig = {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>apiKey: "AIzaSyBv8MWTfNGWzk6hfUv9x_RyvnUsx6JG_ng",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>authDomain: "d-pancake.firebaseapp.com",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>projectId: "d-pancake",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>storageBucket: "d-pancake.firebasestorage.app",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>messagingSenderId: "102855872512",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>appId: "1:102855872512:web:136247810838c84f2508e5"</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>};</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const app = initializeApp(firebaseConfig);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const db = getFirestore(app);</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>// 把 db 挂载到 window 上，让其他 script 能访问</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>window.db = db;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>window.collection = collection;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>window.doc = doc;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>window.setDoc = setDoc;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>window.deleteDoc = deleteDoc;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>window.onSnapshot = onSnapshot;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>window.getDocs = getDocs;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>window.firebaseReady = true;</span></p>
+<p class="p1"><span class="s1">&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1">&lt;style&gt;</span></p>
+<p class="p1"><span class="s1">.calendar-day{min-height:60px;}</span></p>
+<p class="p1"><span class="s1">.tag-dot{width:8px;height:8px;border-radius:50%;}</span></p>
+<p class="p1"><span class="s1">.edit-item-btn{font-size:12px;}</span></p>
+<p class="p1"><span class="s1">&lt;/style&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/head&gt;</span></p>
+<p class="p1"><span class="s1">&lt;body class="bg-slate-100 min-h-screen"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div class="max-w-7xl mx-auto p-4"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="flex flex-wrap gap-3 items-center mb-6"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;button id="tabCal" class="px-5 py-2 rounded-lg bg-blue-500 text-white"&gt;日历视图&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;button id="tabList" class="px-5 py-2 rounded-lg bg-white border"&gt;计划列表&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;button onclick="openAddPlanModal()" class="ml-auto px-5 py-2 rounded-lg bg-emerald-500 text-white"&gt;新增计划&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div id="viewCalendar" class="block"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="flex justify-between items-center mb-3"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;button onclick="prevMonth()" class="px-3 py-1 bg-white rounded"&gt;←上月&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;h2 id="curMonthText" class="text-xl font-bold"&gt;&lt;/h2&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;button onclick="nextMonth()" class="px-3 py-1 bg-white rounded"&gt;下月→&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="grid grid-cols-7 text-center font-semibold mb-2"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;span&gt;周日&lt;/span&gt;&lt;span&gt;周一&lt;/span&gt;&lt;span&gt;周二&lt;/span&gt;&lt;span&gt;周三&lt;/span&gt;&lt;span&gt;周四&lt;/span&gt;&lt;span&gt;周五&lt;/span&gt;&lt;span&gt;周六&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div id="calendarBox" class="grid grid-cols-7 gap-2"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div id="viewList" class="hidden space-y-4"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div id="planListBox"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!-- 新增计划弹窗 --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div id="addPlanModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-2"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h3 class="text-lg font-bold mb-4"&gt;新建群组计划&lt;/h3&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;input type="hidden" id="editGroupId"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="space-y-4"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;label class="block text-sm text-gray-600"&gt;选择日期&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;input type="date" id="planDateSel" class="w-full border rounded p-2 mt-1" onchange="refreshSameDayIp()"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;label class="block text-sm text-gray-600"&gt;IP&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;div class="flex gap-2 mt-1"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;select id="existIpSel" class="flex-1 border rounded p-2" onchange="autoFillAddressByIp()"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;option value=""&gt;手动填写新IP&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;input type="text" id="newIpInput" placeholder="输入新IP" class="flex-1 border rounded p-2"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;label class="block text-sm text-gray-600"&gt;活动性质&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;select id="planTypeSel" class="w-full border rounded p-2 mt-1"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;option value="漫展"&gt;漫展&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;option value="团建"&gt;团建&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;option value="正片"&gt;正片&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div class="grid grid-cols-2 gap-3"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;label class="block text-sm text-gray-600"&gt;选择省份&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;select id="provinceSel" class="w-full border rounded p-2 mt-1" onchange="changeProvince()"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;option value=""&gt;请选择省份&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;label class="block text-sm text-gray-600"&gt;选择城市&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;select id="citySel" class="w-full border rounded p-2 mt-1"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;option value=""&gt;先选省份&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;label class="block text-sm text-gray-600"&gt;详细具体地址&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;input type="text" id="addressInput" placeholder="场馆/门店/详细地点" class="w-full border rounded p-2 mt-1"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;label class="block text-sm text-gray-600"&gt;选择参与成员&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;div class="flex gap-2 mt-1 mb-2"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;input id="addMemberInput" placeholder="输入成员名字" class="flex-1 border rounded p-2"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;button onclick="addNewMemberOpt()" class="px-3 bg-gray-200 rounded"&gt;添加&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;div id="memberCheckBox" class="flex flex-wrap gap-2"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div id="memberInfoWrap" class="border p-3 rounded space-y-3"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;p class="text-sm text-gray-500"&gt;勾选成员后填写角色与状态&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="flex justify-end gap-3 mt-6"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;button onclick="closeAddModal()" class="px-4 py-2 bg-gray-200 rounded"&gt;取消&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;button onclick="saveGroupPlan()" class="px-4 py-2 bg-blue-500 text-white"&gt;保存计划&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!-- 成员单独编辑弹窗 --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div id="memberEditModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-2"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="bg-white rounded-xl w-full max-w-md p-5"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h3 class="text-lg font-bold mb-4" id="editMemberName"&gt;编辑成员信息&lt;/h3&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="space-y-3"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;label class="text-sm text-gray-600"&gt;快捷角色&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;select id="editQuickRole" class="w-full border rounded p-2 mt-1" onchange="switchEditRoleType()"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;option value=""&gt;自定义角色&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;option value="摄影"&gt;摄影&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;option value="后勤"&gt;后勤&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;label class="text-sm text-gray-600"&gt;扮演角色&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;input type="text" id="editRoleInput" class="w-full border rounded p-2 mt-2" placeholder="填写角色"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div id="editStatusBox"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;label class="text-sm text-gray-600"&gt;准备状态&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;select id="editStatusSel" class="w-full border rounded p-2 mt-1"&gt;&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="flex justify-end gap-3 mt-5"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;button onclick="closeMemberEdit()" class="px-4 py-2 bg-gray-200 rounded"&gt;取消&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;button onclick="saveMemberEdit()" class="px-4 py-2 bg-blue-500 text-white"&gt;保存修改&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;!-- 详情弹窗 --&gt;</span></p>
+<p class="p1"><span class="s1">&lt;div id="detailModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-2"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;h3 class="text-lg font-bold mb-4" id="detailTitle"&gt;&lt;/h3&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="text-sm mb-2"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;span class="text-gray-600"&gt;省市：&lt;/span&gt;&lt;span id="showProvinceCity"&gt;&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;span class="ml-4 text-gray-600"&gt;详细地址：&lt;/span&gt;&lt;span id="showAddress"&gt;&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div id="detailContent" class="space-y-3"&gt;&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="flex justify-end gap-3 mt-5"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;button onclick="delCurrentPlan()" class="px-4 py-2 bg-red-500 text-white"&gt;删除整条计划&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;button onclick="closeDetailModal()" class="px-4 py-2 bg-gray-200 rounded"&gt;关闭&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">&lt;script&gt;</span></p>
+<p class="p1"><span class="s1">// ========== Firebase 数据操作 ==========</span></p>
+<p class="p1"><span class="s1">let isSyncing = false;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">async function loadPlansFromFirestore() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if (!window.firebaseReady) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const plansRef = collection(window.db, "plans");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const snapshot = await getDocs(plansRef);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>window.planData = [];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>snapshot.forEach(doc =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>window.planData.push({ id: doc.id, ...doc.data() });</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>// 把 id 转成数字类型（保持兼容）</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>window.planData = window.planData.map(p =&gt; ({ ...p, id: isNaN(Number(p.id)) ? p.id : Number(p.id) }));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>renderCalendar();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>renderPlanList();</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function listenPlansRealtime() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if (!window.firebaseReady) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const plansRef = collection(window.db, "plans");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>onSnapshot(plansRef, (snapshot) =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (isSyncing) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>isSyncing = true;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>snapshot.docChanges().forEach(change =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if (change.type === "added" || change.type === "modified") {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const existingIndex = window.planData.findIndex(p =&gt; p.id == change.doc.id);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>const newData = { id: change.doc.id, ...change.doc.data() };</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>if (existingIndex &gt;= 0) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>window.planData[existingIndex] = newData;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>} else {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>window.planData.push(newData);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>} else if (change.type === "removed") {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>window.planData = window.planData.filter(p =&gt; p.id != change.doc.id);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>renderCalendar();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>renderPlanList();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>isSyncing = false;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>});</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">async function syncAllPlansToFirestore() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if (!window.firebaseReady || isSyncing) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>isSyncing = true;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>for (const plan of window.planData) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const planRef = doc(window.db, "plans", String(plan.id));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const { id, ...data } = plan;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>await setDoc(planRef, data);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>isSyncing = false;</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">async function deletePlanFromFirestore(planId) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if (!window.firebaseReady) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const planRef = doc(window.db, "plans", String(planId));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>await deleteDoc(planRef);</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// ========== 网页内置固定数据 ==========</span></p>
+<p class="p1"><span class="s1">let planData = window.planData || [];</span></p>
+<p class="p1"><span class="s1">let baseMemberList = ["章鱼肉","祈宫","小曼","夏熙"];</span></p>
+<p class="p1"><span class="s1">let allMemberOpt = [...baseMemberList];</span></p>
+<p class="p1"><span class="s1">const statusArr = ["未确定角色","无装备","仅有假发","仅有服饰道具","已准备齐全"];</span></p>
+<p class="p1"><span class="s1">const selectRoleList = ["摄影","后勤"];</span></p>
+<p class="p1"><span class="s1">let nowDate = new Date();</span></p>
+<p class="p1"><span class="s1">let showYear = nowDate.getFullYear();</span></p>
+<p class="p1"><span class="s1">let showMonth = nowDate.getMonth();</span></p>
+<p class="p1"><span class="s1">let currentViewPlan = null;</span></p>
+<p class="p1"><span class="s1">let editTargetMemberName = "";</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// 同步 planData 引用</span></p>
+<p class="p1"><span class="s1">window.planData = planData;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// 初始化省份</span></p>
+<p class="p1"><span class="s1">function initProvinceSelect(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let pSel = document.getElementById("provinceSel");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>Object.keys(areaData).forEach(p=&gt;pSel.innerHTML += `&lt;option value="${p}"&gt;${p}&lt;/option&gt;`);</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// 省份联动城市</span></p>
+<p class="p1"><span class="s1">function changeProvince(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let p = document.getElementById("provinceSel").value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let cSel = document.getElementById("citySel");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>cSel.innerHTML = "&lt;option value=''&gt;请选择城市&lt;/option&gt;";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(!p)return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>areaData[p].forEach(c=&gt;cSel.innerHTML += `&lt;option value="${c}"&gt;${c}&lt;/option&gt;`);</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// 获取当日所有IP</span></p>
+<p class="p1"><span class="s1">function getSameDayAllIp(dateStr){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>return [...new Set(planData.filter(i=&gt;i.date===dateStr).map(i=&gt;i.ip))];</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// 选中同一天已有IP → 自动填充相同地点</span></p>
+<p class="p1"><span class="s1">function autoFillAddressByIp(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let date = document.getElementById("planDateSel").value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let selIp = document.getElementById("existIpSel").value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(!selIp) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let sameIpInfo = planData.find(item=&gt;item.date===date &amp;&amp; item.ip===selIp);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(!sameIpInfo) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("provinceSel").value = sameIpInfo.province || "";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>changeProvince();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>setTimeout(()=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById("citySel").value = sameIpInfo.city || "";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>},50);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("addressInput").value = sameIpInfo.address || "";</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// 刷新当日IP下拉</span></p>
+<p class="p1"><span class="s1">function refreshSameDayIp(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let date = document.getElementById("planDateSel").value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let ips = getSameDayAllIp(date);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let sel = document.getElementById("existIpSel");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>sel.innerHTML = `&lt;option value=""&gt;手动填写新IP&lt;/option&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>ips.forEach(ip=&gt;sel.innerHTML += `&lt;option value="${ip}"&gt;${ip}（当日已有）&lt;/option&gt;`);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("provinceSel").value="";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("citySel").innerHTML="&lt;option value=''&gt;先选省份&lt;/option&gt;";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("addressInput").value="";</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// 视图切换</span></p>
+<p class="p1"><span class="s1">document.getElementById("tabCal").onclick=function(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("viewCalendar").classList.remove("hidden");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("viewList").classList.add("hidden");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>this.classList.add("bg-blue-500","text-white");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>this.classList.remove("bg-white","border");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("tabList").classList.remove("bg-blue-500","text-white");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("tabList").classList.add("bg-white","border");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>renderCalendar();</span></p>
+<p class="p1"><span class="s1">};</span></p>
+<p class="p1"><span class="s1">document.getElementById("tabList").onclick=function(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("viewList").classList.remove("hidden");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("viewCalendar").classList.add("hidden");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>this.classList.add("bg-blue-500","text-white");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>this.classList.remove("bg-white","border");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("tabCal").classList.remove("bg-blue-500","text-white");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("tabCal").classList.add("bg-white","border");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>renderPlanList();</span></p>
+<p class="p1"><span class="s1">};</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function prevMonth(){showMonth--;if(showMonth&lt;0){showMonth=11;showYear--;}renderCalendar();}</span></p>
+<p class="p1"><span class="s1">function nextMonth(){showMonth++;if(showMonth&gt;11){showMonth=0;showYear++;}renderCalendar();}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function renderCalendar(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("curMonthText").innerText = `${showYear}年${showMonth+1}月`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let firstDay = new Date(showYear,showMonth,1).getDay();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let totalDay = new Date(showYear,showMonth+1,0).getDate();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let box = document.getElementById("calendarBox");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>box.innerHTML = "";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>for(let i=0;i&lt;firstDay;i++) box.innerHTML += `&lt;div class="calendar-day bg-gray-50 rounded p-2"&gt;&lt;/div&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>for(let d=1;d&lt;=totalDay;d++){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let dateStr = `${showYear}-${String(showMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let hasPlan = planData.some(item=&gt;item.date===dateStr);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>box.innerHTML += `</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="calendar-day bg-white border rounded p-2 cursor-pointer hover:border-blue-400" onclick="openDatePlanView('${dateStr}')"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div class="font-medium"&gt;${d}&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>${hasPlan?'&lt;div class="flex gap-1 mt-1"&gt;&lt;span class="tag-dot bg-blue-500"&gt;&lt;/span&gt;&lt;/div&gt;':''}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function openAddPlanModal(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("addPlanModal").classList.remove("hidden");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("editGroupId").value="";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("planDateSel").value = new Date().toISOString().split("T")[0];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>refreshSameDayIp();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>refreshMemberCheck();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("memberInfoWrap").innerHTML = '&lt;p class="text-sm text-gray-500"&gt;勾选成员后填写角色与状态&lt;/p&gt;';</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p1"><span class="s1">function closeAddModal(){document.getElementById("addPlanModal").classList.add("hidden");}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function refreshMemberCheck(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let box = document.getElementById("memberCheckBox");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>box.innerHTML = "";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>allMemberOpt.forEach(name=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>box.innerHTML += `&lt;label class="flex items-center gap-1 border px-2 py-1 rounded cursor-pointer"&gt;&lt;input type="checkbox" value="${name}" onchange="changeMemberSelect()"&gt; ${name}&lt;/label&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>});</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function addNewMemberOpt(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let name = document.getElementById("addMemberInput").value.trim();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(!name||allMemberOpt.includes(name))return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>allMemberOpt.push(name);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("addMemberInput").value="";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>refreshMemberCheck();</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function changeMemberSelect(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let checks = document.querySelectorAll("#memberCheckBox input:checked");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let wrap = document.getElementById("memberInfoWrap");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let html = '&lt;p class="text-sm text-gray-500"&gt;勾选成员后填写角色与状态&lt;/p&gt;';</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>checks.forEach(cb=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let uname = cb.value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>html += `</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="border-t pt-2 mt-2"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;p class="font-medium"&gt;${uname}&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div class="grid grid-cols-2 gap-2 mt-1"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;select class="pre-role border rounded p-1" data-name="${uname}"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>&lt;option value=""&gt;自定义角色&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                        </span>${selectRoleList.map(r=&gt;`&lt;option value="${r}"&gt;${r}&lt;/option&gt;`).join("")}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>&lt;input type="text" class="mem-role border rounded p-1 mt-1" data-name="${uname}" placeholder="自定义扮演角色"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;select class="mem-status border rounded p-1" data-name="${uname}"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                    </span>${statusArr.map(s=&gt;`&lt;option value="${s}"&gt;${s}&lt;/option&gt;`).join("")}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;/select&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>wrap.innerHTML = html;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.querySelectorAll(".pre-role").forEach(s=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>s.onchange=function(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>let n=this.dataset.name,v=this.value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>let st=document.querySelector(`.mem-status[data-name="${n}"]`);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>let inp=document.querySelector(`.mem-role[data-name="${n}"]`);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>if(selectRoleList.includes(v)){st.style.display="none";inp.value=v;inp.disabled=true;}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>else{st.style.display="block";inp.disabled=false;}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>});</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">async function saveGroupPlan(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let editId = document.getElementById("editGroupId").value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let date = document.getElementById("planDateSel").value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let selIp = document.getElementById("existIpSel").value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let newIp = document.getElementById("newIpInput").value.trim();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let ipName = selIp||newIp;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let type = document.getElementById("planTypeSel").value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let province = document.getElementById("provinceSel").value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let city = document.getElementById("citySel").value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let address = document.getElementById("addressInput").value.trim();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(!date||!ipName){alert("请选择日期并填写IP");return;}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let memberArr = [];</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.querySelectorAll(".mem-role").forEach(ri=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let un=ri.dataset.name,ro=ri.value.trim();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let st="";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.querySelectorAll(".mem-status").forEach(si=&gt;{if(si.dataset.name===un)st=si.value;});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if(!ro){alert(`请填写${un}角色`);throw "";}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>memberArr.push({userName:un,userRole:ro,userStatus:st});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(memberArr.length===0){alert("请勾选成员");return;}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(editId){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let idx = planData.findIndex(p=&gt;p.id==editId);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if(idx&gt;-1){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>planData[idx]={...planData[idx],date,ip:ipName,planType:type,province,city,address,memberList:memberArr};</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}else{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let exist = planData.find(p=&gt;p.date===date&amp;&amp;p.ip===ipName&amp;&amp;p.planType===type);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if(exist) exist.memberList.push(...memberArr);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>else planData.push({id:Date.now(),date,ip:ipName,planType:type,province,city,address,memberList:memberArr});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>closeAddModal();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>renderCalendar();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>renderPlanList();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>await syncAllPlansToFirestore();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>alert("保存成功！同IP自动共用地点");</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function renderPlanList(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let box = document.getElementById("planListBox");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>box.innerHTML = "";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let map = {};</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>planData.forEach(item=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let k=`${item.date}|${item.ip}|${item.planType}`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if(!map[k])map[k]={...item,memberList:[]};</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>map[k].memberList.push(...item.memberList);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let list = Object.values(map).sort((a,b)=&gt;a.date.localeCompare(b.date));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(list.length===0){box.innerHTML='&lt;div class="text-center py-10 text-gray-500"&gt;暂无计划&lt;/div&gt;';return;}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>list.forEach(item=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>box.innerHTML += `</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="bg-white p-4 rounded-lg border cursor-pointer hover:shadow" onclick='openPlanDetail(${JSON.stringify(item).replace(/'/g, "&amp;#39;")})'&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div class="flex justify-between"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;span class="font-medium"&gt;${item.date} | ${item.ip} | ${item.planType}&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;span class="text-gray-400"&gt;${item.memberList.length}人&lt;/span&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div class="text-sm text-gray-600 mt-1"&gt;地点：${item.province||""}${item.city||""} | 参与：${item.memberList.map(m=&gt;m.userName).join("、")}&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>});</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function openDatePlanView(date){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let arr = planData.filter(p=&gt;p.date===date);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(!arr.length){alert("当日暂无计划");return;}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let map={};</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>arr.forEach(i=&gt;{let k=`${i.date}|${i.ip}|${i.planType}`;if(!map[k])map[k]={...i,memberList:[]};map[k].memberList.push(...i.memberList);});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>openPlanDetail(Object.values(map)[0]);</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function openPlanDetail(data){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>currentViewPlan = data;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("detailTitle").innerText = `${data.date} ${data.ip} ${data.planType} 详情`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("showProvinceCity").innerText = `${data.province||""}${data.city||""}`||"未填写";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("showAddress").innerText = data.address||"无";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let html="";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>data.memberList.forEach(m=&gt;{</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>let txt = selectRoleList.includes(m.userRole)?"无需准备状态":m.userStatus;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>html += `</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;div class="border p-3 rounded flex justify-between items-start"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;p&gt;&lt;b&gt;成员：&lt;/b&gt;${m.userName}&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;p&gt;&lt;b&gt;扮演角色：&lt;/b&gt;${m.userRole}&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">                </span>&lt;p&gt;&lt;b&gt;准备状态：&lt;/b&gt;${txt}&lt;/p&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">            </span>&lt;button class="edit-item-btn bg-amber-400 text-white px-2 py-1 rounded" onclick="openSingleMemberEdit('${m.userName}')"&gt;编辑此成员&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>&lt;/div&gt;`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("detailContent").innerHTML=html;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("detailModal").classList.remove("hidden");</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function openSingleMemberEdit(name){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>editTargetMemberName=name;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let m = currentViewPlan.memberList.find(x=&gt;x.userName===name);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(!m)return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("editMemberName").innerText=`编辑${name}信息`;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("editQuickRole").value=selectRoleList.includes(m.userRole)?m.userRole:"";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("editRoleInput").value=m.userRole;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let stSel=document.getElementById("editStatusSel");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>stSel.innerHTML=statusArr.map(s=&gt;`&lt;option value="${s}"&gt;${s}&lt;/option&gt;`).join("");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>stSel.value=m.userStatus;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>switchEditRoleType();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>document.getElementById("memberEditModal").classList.remove("hidden");</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">function switchEditRoleType(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let v=document.getElementById("editQuickRole").value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let inp=document.getElementById("editRoleInput");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let box=document.getElementById("editStatusBox");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(selectRoleList.includes(v)){inp.value=v;inp.disabled=true;box.style.display="none";}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>else{inp.disabled=false;box.style.display="block";}</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">async function saveMemberEdit(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let r=document.getElementById("editRoleInput").value.trim();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let s=document.getElementById("editStatusSel").value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(!r){alert("角色不能为空");return;}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let idx=currentViewPlan.memberList.findIndex(x=&gt;x.userName===editTargetMemberName);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(idx&gt;-1){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>currentViewPlan.memberList[idx].userRole=r;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>currentViewPlan.memberList[idx].userStatus=selectRoleList.includes(r)?"":s;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let mainIdx=planData.findIndex(p=&gt;p.id===currentViewPlan.id);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(mainIdx&gt;-1) planData[mainIdx].memberList=currentViewPlan.memberList;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>closeMemberEdit();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>openPlanDetail(currentViewPlan);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>await syncAllPlansToFirestore();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>alert("修改完成");</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p1"><span class="s1">function closeMemberEdit(){document.getElementById("memberEditModal").classList.add("hidden");}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">async function delCurrentPlan(){</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if(!confirm("确定删除？"))return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>planData=planData.filter(p=&gt;p.id!==currentViewPlan.id);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>closeDetailModal();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>renderCalendar();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>renderPlanList();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>await deletePlanFromFirestore(currentViewPlan.id);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>alert("删除成功");</span></p>
+<p class="p1"><span class="s1">}</span></p>
+<p class="p1"><span class="s1">function closeDetailModal(){document.getElementById("detailModal").classList.add("hidden");currentViewPlan=null;}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// 内置省市数据</span></p>
+<p class="p1"><span class="s1">const areaData = {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"北京市":["北京市"],"天津市":["天津市"],"上海市":["上海市"],"重庆市":["重庆市"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"河北省":["石家庄","唐山","秦皇岛","邯郸","邢台","保定","张家口","承德","沧州","廊坊","衡水"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"山西省":["太原","大同","朔州","忻州","阳泉","吕梁","晋中","长治","晋城","临汾","运城"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"辽宁省":["沈阳","大连","鞍山","抚顺","本溪","丹东","锦州","营口","阜新","辽阳","盘锦","铁岭","朝阳","葫芦岛"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"吉林省":["长春","吉林","四平","辽源","通化","白山","松原","白城","延边"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"黑龙江省":["哈尔滨","齐齐哈尔","鸡西","鹤岗","双鸭山","大庆","伊春","佳木斯","七台河","牡丹江","黑河","绥化","大兴安岭"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"江苏省":["南京","无锡","徐州","常州","苏州","南通","连云港","淮安","盐城","扬州","镇江","泰州","宿迁"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"浙江省":["杭州","宁波","温州","嘉兴","湖州","绍兴","金华","衢州","舟山","台州","丽水"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"安徽省":["合肥","芜湖","蚌埠","淮南","马鞍山","淮北","铜陵","安庆","黄山","滁州","阜阳","宿州","六安","亳州","池州","宣城"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"福建省":["福州","厦门","莆田","三明","泉州","漳州","南平","龙岩","宁德"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"江西省":["南昌","景德镇","萍乡","九江","新余","鹰潭","赣州","吉安","宜春","抚州","上饶"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"山东省":["济南","青岛","淄博","枣庄","东营","烟台","潍坊","济宁","泰安","威海","日照","临沂","德州","聊城","滨州","菏泽"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"河南省":["郑州","开封","洛阳","平顶山","安阳","鹤壁","新乡","焦作","濮阳","许昌","漯河","三门峡","南阳","商丘","信阳","周口","驻马店"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"湖北省":["武汉","黄石","十堰","宜昌","襄阳","鄂州","荆门","孝感","荆州","黄冈","咸宁","随州","恩施"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"湖南省":["长沙","株洲","湘潭","衡阳","邵阳","岳阳","常德","张家界","益阳","郴州","永州","怀化","娄底","湘西"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"广东省":["广州","深圳","珠海","汕头","佛山","韶关","湛江","肇庆","江门","茂名","惠州","梅州","汕尾","河源","阳江","清远","东莞","中山","潮州","揭阳","云浮"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"海南省":["海口","三亚","三沙","儋州","五指山","文昌","琼海","万宁","东方","定安","屯昌","澄迈","临高","白沙","昌江","乐东","陵水","保亭","琼中"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"四川省":["成都","自贡","攀枝花","泸州","德阳","绵阳","广元","遂宁","内江","乐山","南充","眉山","宜宾","广安","达州","雅安","巴中","资阳","阿坝","甘孜","凉山"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"贵州省":["贵阳","六盘水","遵义","安顺","毕节","铜仁","黔东南","黔南","黔西南"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"云南省":["昆明","曲靖","玉溪","保山","昭通","丽江","普洱","临沧","楚雄","红河","文山","西双版纳","大理","德宏","怒江","迪庆"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"陕西省":["西安","铜川","宝鸡","咸阳","渭南","延安","汉中","榆林","安康","商洛"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"甘肃省":["兰州","嘉峪关","金昌","白银","天水","武威","张掖","平凉","酒泉","庆阳","定西","陇南","临夏","甘南"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"青海省":["西宁","海东","海北","黄南","海南","果洛","玉树","海西"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"台湾省":["台北","新北","桃园","台中","台南","高雄","基隆","新竹","嘉义","新竹县","苗栗县","彰化县","南投县","云林县","嘉义县","屏东县","宜兰县","花莲县","台东县","澎湖县"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"内蒙古":["呼和浩特","包头","乌海","赤峰","通辽","鄂尔多斯","呼伦贝尔","巴彦淖尔","乌兰察布","兴安盟","锡林郭勒","阿拉善"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"广西":["南宁","柳州","桂林","梧州","北海","防城港","钦州","贵港","玉林","百色","贺州","河池","来宾","崇左"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"西藏":["拉萨","日喀则","昌都","林芝","山南","那曲","阿里"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"宁夏":["银川","石嘴山","吴忠","固原","中卫"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"新疆":["乌鲁木齐","克拉玛依","吐鲁番","哈密","昌吉","博尔塔拉","巴音郭楞","阿克苏","克孜勒苏","喀什","和田","伊犁","塔城","阿勒泰"],</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>"香港特别行政区":["香港"],"澳门特别行政区":["澳门"]</span></p>
+<p class="p1"><span class="s1">};</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">initProvinceSelect();</span></p>
+<p class="p1"><span class="s1">renderCalendar();</span></p>
+<p class="p1"><span class="s1">renderPlanList();</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1">// 启动 Firebase 加载</span></p>
+<p class="p1"><span class="s1">setTimeout(() =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>if (window.firebaseReady) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>loadPlansFromFirestore().then(() =&gt; listenPlansRealtime());</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p1"><span class="s1">}, 500);</span></p>
+<p class="p1"><span class="s1">&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/body&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/html&gt;</span></p>
+</body>
+</html>
