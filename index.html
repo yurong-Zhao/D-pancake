@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>团队协同计划表 - 催办版</title>
+<title>来画一个美味大饼</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -30,6 +30,8 @@
 .tag-dot{width:8px;height:8px;border-radius:50%;}
 .urge-btn{transition: all 0.1s ease;}
 .urge-btn:active{transform: scale(0.9);}
+.delete-member-btn{transition: all 0.1s ease;}
+.delete-member-btn:active{transform: scale(0.9);}
 </style>
 </head>
 <body class="bg-slate-100 min-h-screen">
@@ -120,32 +122,7 @@
     </div>
 </div>
 
-<!-- 成员单独编辑弹窗 -->
-<div id="memberEditModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-2">
-    <div class="bg-white rounded-xl w-full max-w-md p-5">
-        <h3 class="text-lg font-bold mb-4" id="editMemberName">编辑成员信息</h3>
-        <div class="space-y-3">
-            <div>
-                <label class="text-sm text-gray-600">快捷角色</label>
-                <select id="editQuickRole" class="w-full border rounded p-2 mt-1" onchange="switchEditRoleType()">
-                    <option value="">自定义角色</option>
-                    <option value="摄影">摄影</option>
-                    <option value="后勤">后勤</option>
-                </select>
-            </div>
-            <div>
-                <label class="text-sm text-gray-600">扮演角色</label>
-                <input type="text" id="editRoleInput" class="w-full border rounded p-2 mt-2" placeholder="填写角色">
-            </div>
-        </div>
-        <div class="flex justify-end gap-3 mt-5">
-            <button onclick="closeMemberEdit()" class="px-4 py-2 bg-gray-200 rounded">取消</button>
-            <button onclick="saveMemberEdit()" class="px-4 py-2 bg-blue-500 text-white">保存修改</button>
-        </div>
-    </div>
-</div>
-
-<!-- 详情弹窗 -->
+<!-- 详情弹窗（合并后的计划详情，可催促/改状态/删除成员） -->
 <div id="detailModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-2">
     <div class="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5">
         <h3 class="text-lg font-bold mb-4" id="detailTitle"></h3>
@@ -201,7 +178,7 @@ let planData = [];
 let globalIpList = [];
 let globalMemberList = ["章鱼肉","祈宫","小曼","夏熙"];
 let currentViewPlan = null;
-let editTargetMemberName = "";
+let currentMergedPlanKey = null;  // 当前打开的合并计划的 key
 let showYear = new Date().getFullYear();
 let showMonth = new Date().getMonth();
 
@@ -230,7 +207,6 @@ function changeProvince() {
 // ========== 加载全局数据 ==========
 async function loadGlobalLists() {
     try {
-        // 加载IP列表
         const ipSnapshot = await db.collection("global_ips").get();
         if (!ipSnapshot.empty) {
             globalIpList = [];
@@ -240,7 +216,6 @@ async function loadGlobalLists() {
             await db.collection("global_ips").doc("default").set({name:"默认IP"});
             globalIpList.push("默认IP");
         }
-        // 加载成员列表
         const memberSnapshot = await db.collection("global_members").get();
         if (!memberSnapshot.empty) {
             globalMemberList = [];
@@ -287,7 +262,6 @@ function refreshMemberCheck() {
     });
 }
 
-// 监听新IP输入
 document.getElementById("newIpInput")?.addEventListener("blur", function() {
     let val = this.value.trim();
     if (val) saveNewIp(val);
@@ -353,10 +327,18 @@ function changeMemberSelect() {
 }
 
 // ========== 催促功能 ==========
-async function addUrge(planId, memberName) {
-    let plan = planData.find(p => String(p.id) === String(planId));
-    if (!plan) return;
-    let member = plan.memberList.find(m => m.userName === memberName);
+async function addUrgeInDetail(planKey, memberName) {
+    // planKey 格式: date|ip|planType
+    let plans = planData.filter(p => `${p.date}|${p.ip}|${p.planType}` === planKey);
+    if (plans.length === 0) return;
+    let member = null;
+    for (let plan of plans) {
+        let m = plan.memberList.find(m => m.userName === memberName);
+        if (m) {
+            member = m;
+            break;
+        }
+    }
     if (!member) return;
     if (member.userStatus === "已准备齐全") {
         alert("该成员已准备齐全，无法催促");
@@ -364,9 +346,13 @@ async function addUrge(planId, memberName) {
     }
     member.urgeCount = (member.urgeCount || 0) + 1;
     if (member.urgeCount > 10) member.urgeCount = 10;
-    await syncSinglePlanToFirestore(plan);
-    renderPlanList();
-    renderCalendar();
+    
+    // 同步所有相关计划到 Firestore
+    for (let plan of plans) {
+        await syncSinglePlanToFirestore(plan);
+    }
+    // 刷新详情弹窗
+    openMergedPlanDetail(planKey);
 }
 
 function getUrgeIcons(count) {
@@ -376,18 +362,40 @@ function getUrgeIcons(count) {
     return icons;
 }
 
-async function changeMemberStatusInList(planId, memberName, newStatus) {
-    let plan = planData.find(p => String(p.id) === String(planId));
-    if (!plan) return;
-    let member = plan.memberList.find(m => m.userName === memberName);
-    if (!member) return;
-    member.userStatus = newStatus;
-    if (newStatus === "已准备齐全") {
-        member.urgeCount = 0;
+async function changeMemberStatusInDetail(planKey, memberName, newStatus) {
+    let plans = planData.filter(p => `${p.date}|${p.ip}|${p.planType}` === planKey);
+    if (plans.length === 0) return;
+    for (let plan of plans) {
+        let member = plan.memberList.find(m => m.userName === memberName);
+        if (member) {
+            member.userStatus = newStatus;
+            if (newStatus === "已准备齐全") {
+                member.urgeCount = 0;
+            }
+            await syncSinglePlanToFirestore(plan);
+        }
     }
-    await syncSinglePlanToFirestore(plan);
+    openMergedPlanDetail(planKey);
+}
+
+async function deleteMemberFromPlan(planKey, memberName) {
+    if (!confirm(`确定将 ${memberName} 从该计划中移除吗？`)) return;
+    let plans = planData.filter(p => `${p.date}|${p.ip}|${p.planType}` === planKey);
+    for (let plan of plans) {
+        plan.memberList = plan.memberList.filter(m => m.userName !== memberName);
+        if (plan.memberList.length === 0) {
+            // 如果没有成员了，删除整个计划
+            planData = planData.filter(p => p.id !== plan.id);
+            await db.collection("plans").doc(String(plan.id)).delete();
+        } else {
+            await syncSinglePlanToFirestore(plan);
+        }
+    }
+    // 重新加载并刷新
+    await loadPlansFromFirestore();
     renderPlanList();
-    renderCalendar();
+    closeDetailModal();
+    alert(`已移除 ${memberName}`);
 }
 
 async function syncSinglePlanToFirestore(plan) {
@@ -396,123 +404,128 @@ async function syncSinglePlanToFirestore(plan) {
     await planRef.set(data);
 }
 
-// ========== 渲染计划列表 ==========
+async function loadPlansFromFirestore() {
+    const snapshot = await db.collection("plans").get();
+    planData = [];
+    snapshot.forEach(doc => {
+        let data = doc.data();
+        data.id = doc.id;
+        planData.push(data);
+    });
+}
+
+// ========== 合并计划列表渲染 ==========
 function renderPlanList() {
     let box = document.getElementById("planListBox");
     if (!box) return;
     box.innerHTML = "";
-    if (planData.length === 0) {
+    
+    // 合并计划：按 date|ip|planType 分组
+    let mergedMap = new Map();
+    planData.forEach(plan => {
+        let key = `${plan.date}|${plan.ip}|${plan.planType}`;
+        if (!mergedMap.has(key)) {
+            mergedMap.set(key, {
+                key: key,
+                date: plan.date,
+                ip: plan.ip,
+                planType: plan.planType,
+                province: plan.province,
+                city: plan.city,
+                address: plan.address,
+                memberCount: 0,
+                urgeCount: 0
+            });
+        }
+        let merged = mergedMap.get(key);
+        merged.memberCount += plan.memberList.length;
+        plan.memberList.forEach(m => {
+            merged.urgeCount += (m.urgeCount || 0);
+        });
+    });
+    
+    let mergedList = Array.from(mergedMap.values()).sort((a,b) => (a.date || "").localeCompare(b.date || ""));
+    
+    if (mergedList.length === 0) {
         box.innerHTML = '<div class="text-center py-10 text-gray-500">暂无计划</div>';
         return;
     }
-    planData.sort((a,b) => (a.date || "").localeCompare(b.date || "")).forEach(plan => {
+    
+    mergedList.forEach(merged => {
+        let urgeIcon = merged.urgeCount > 0 ? `🔥${merged.urgeCount}` : "";
         let planDiv = document.createElement("div");
-        planDiv.className = "bg-white p-4 rounded-lg border mb-3";
+        planDiv.className = "bg-white p-4 rounded-lg border mb-3 cursor-pointer hover:shadow";
+        planDiv.onclick = () => openMergedPlanDetail(merged.key);
         planDiv.innerHTML = `
-            <div class="font-medium mb-2">📅 ${plan.date || "无日期"} | ${plan.ip || ""} | ${plan.planType || ""}</div>
-            <div class="text-sm text-gray-600 mb-2">📍 ${plan.province || ""}${plan.city || ""} ${plan.address || ""}</div>
-            <div class="space-y-2">
-                ${plan.memberList && plan.memberList.map(m => `
-                    <div class="flex flex-wrap items-center gap-2 border-t pt-2">
-                        <span class="font-medium w-20">${m.userName}</span>
-                        <span class="text-xs bg-gray-100 px-2 py-0.5 rounded">${m.userRole || "未填"}</span>
-                        <span class="text-sm">${getUrgeIcons(m.urgeCount || 0)}</span>
-                        <button class="urge-btn px-2 py-0.5 bg-orange-400 text-white rounded text-xs" onclick="addUrge('${plan.id}', '${m.userName}')">➕🔥</button>
-                        <select class="status-select border rounded text-xs p-1" data-planid="${plan.id}" data-member="${m.userName}">
-                            ${statusArr.map(s => `<option value="${s}" ${(m.userStatus === s) ? "selected" : ""}>${s}</option>`).join("")}
-                        </select>
-                        <button class="text-blue-500 text-xs underline" onclick="openPlanDetailForEdit('${plan.id}', '${m.userName}')">编辑角色</button>
-                    </div>
-                `).join("")}
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="font-medium">📅 ${merged.date} | ${merged.ip} | ${merged.planType}</div>
+                    <div class="text-sm text-gray-600 mt-1">📍 ${merged.province || ""}${merged.city || ""} ${merged.address || ""}</div>
+                    <div class="text-sm text-gray-500 mt-1">👥 ${merged.memberCount} 人参与</div>
+                </div>
+                <div class="text-orange-500 text-xl">${urgeIcon}</div>
             </div>
         `;
         box.appendChild(planDiv);
     });
-    document.querySelectorAll(".status-select").forEach(sel => {
-        sel.addEventListener("change", function() {
-            let planId = this.dataset.planid;
-            let memberName = this.dataset.member;
-            changeMemberStatusInList(planId, memberName, this.value);
-        });
-    });
 }
 
-function openPlanDetailForEdit(planId, memberName) {
-    let plan = planData.find(p => String(p.id) === String(planId));
-    if (plan) {
-        currentViewPlan = plan;
-        editTargetMemberName = memberName;
-        let member = plan.memberList.find(m => m.userName === memberName);
-        if (member) {
-            document.getElementById("editMemberName").innerText = `编辑${memberName}信息`;
-            document.getElementById("editQuickRole").value = selectRoleList.includes(member.userRole) ? member.userRole : "";
-            document.getElementById("editRoleInput").value = member.userRole || "";
-            switchEditRoleType();
-            document.getElementById("memberEditModal").classList.remove("hidden");
+// ========== 打开合并后的计划详情 ==========
+function openMergedPlanDetail(planKey) {
+    currentMergedPlanKey = planKey;
+    let plans = planData.filter(p => `${p.date}|${p.ip}|${p.planType}` === planKey);
+    if (plans.length === 0) return;
+    
+    let firstPlan = plans[0];
+    document.getElementById("detailTitle").innerHTML = `📅 ${firstPlan.date} | ${firstPlan.ip} | ${firstPlan.planType}`;
+    document.getElementById("showProvinceCity").innerText = `${firstPlan.province || ""}${firstPlan.city || ""}` || "未填写";
+    document.getElementById("showAddress").innerText = firstPlan.address || "无";
+    
+    // 收集所有成员（去重，但保留每个成员的所有信息，取第一个出现的）
+    let memberMap = new Map();
+    for (let plan of plans) {
+        for (let m of plan.memberList) {
+            if (!memberMap.has(m.userName)) {
+                memberMap.set(m.userName, { ...m });
+            }
         }
     }
-}
-
-function openPlanDetail(data) {
-    currentViewPlan = data;
-    document.getElementById("detailTitle").innerText = `${data.date} ${data.ip} ${data.planType} 详情`;
-    document.getElementById("showProvinceCity").innerText = `${data.province || ""}${data.city || ""}` || "未填写";
-    document.getElementById("showAddress").innerText = data.address || "无";
+    let memberList = Array.from(memberMap.values());
+    
     let html = "";
-    data.memberList.forEach(m => {
+    memberList.forEach(m => {
+        let txt = selectRoleList.includes(m.userRole) ? "无需准备状态" : (m.userStatus || "未确定角色");
         html += `
-        <div class="border p-3 rounded flex justify-between items-start">
-            <div>
-                <p><b>成员：</b>${m.userName}</p>
-                <p><b>扮演角色：</b>${m.userRole}</p>
-                <p><b>准备状态：</b>${m.userStatus}</p>
-                <p><b>🔥 催促次数：</b>${m.urgeCount || 0}</p>
+        <div class="border p-3 rounded">
+            <div class="flex flex-wrap items-start justify-between gap-2">
+                <div class="flex-1">
+                    <p><b>👤 ${m.userName}</b></p>
+                    <p><b>角色：</b>${m.userRole || "未填"}</p>
+                    <p><b>状态：</b>${txt}</p>
+                    <p><b>🔥 催促：</b>${getUrgeIcons(m.urgeCount || 0)}</p>
+                </div>
+                <div class="flex flex-col gap-2">
+                    <button class="urge-btn px-3 py-1 bg-orange-400 text-white rounded text-sm" onclick="addUrgeInDetail('${planKey}', '${m.userName}')">➕ 催促</button>
+                    <select class="status-select-detail border rounded text-sm p-1" data-member="${m.userName}">
+                        ${statusArr.map(s => `<option value="${s}" ${(m.userStatus === s) ? "selected" : ""}>${s}</option>`).join("")}
+                    </select>
+                    <button class="delete-member-btn px-3 py-1 bg-red-400 text-white rounded text-sm" onclick="deleteMemberFromPlan('${planKey}', '${m.userName}')">🗑 删除此人</button>
+                </div>
             </div>
-            <button class="edit-item-btn bg-amber-400 text-white px-2 py-1 rounded" onclick="openSingleMemberEdit('${m.userName}')">编辑此成员</button>
         </div>`;
     });
+    
     document.getElementById("detailContent").innerHTML = html;
+    
+    // 绑定状态下拉框事件
+    document.querySelectorAll(".status-select-detail").forEach(sel => {
+        sel.addEventListener("change", function() {
+            let memberName = this.dataset.member;
+            changeMemberStatusInDetail(planKey, memberName, this.value);
+        });
+    });
+    
     document.getElementById("detailModal").classList.remove("hidden");
-}
-
-function openSingleMemberEdit(name) {
-    editTargetMemberName = name;
-    let m = currentViewPlan.memberList.find(x => x.userName === name);
-    if (!m) return;
-    document.getElementById("editMemberName").innerText = `编辑${name}信息`;
-    document.getElementById("editQuickRole").value = selectRoleList.includes(m.userRole) ? m.userRole : "";
-    document.getElementById("editRoleInput").value = m.userRole || "";
-    switchEditRoleType();
-    document.getElementById("memberEditModal").classList.remove("hidden");
-}
-
-function switchEditRoleType() {
-    let v = document.getElementById("editQuickRole").value;
-    let inp = document.getElementById("editRoleInput");
-    if (selectRoleList.includes(v)) {
-        inp.value = v;
-        inp.disabled = true;
-    } else {
-        inp.disabled = false;
-    }
-}
-
-async function saveMemberEdit() {
-    let r = document.getElementById("editRoleInput").value.trim();
-    if (!r) { alert("角色不能为空"); return; }
-    let idx = currentViewPlan.memberList.findIndex(x => x.userName === editTargetMemberName);
-    if (idx > -1) {
-        currentViewPlan.memberList[idx].userRole = r;
-        if (selectRoleList.includes(r) && currentViewPlan.memberList[idx].userStatus !== "已准备齐全") {
-            currentViewPlan.memberList[idx].userStatus = "无需准备状态";
-        }
-    }
-    let mainIdx = planData.findIndex(p => String(p.id) === String(currentViewPlan.id));
-    if (mainIdx > -1) planData[mainIdx].memberList = currentViewPlan.memberList;
-    await syncSinglePlanToFirestore(currentViewPlan);
-    closeMemberEdit();
-    renderPlanList();
-    alert("修改完成");
 }
 
 // ========== 保存计划 ==========
@@ -588,25 +601,25 @@ function renderCalendar() {
 }
 
 function openDatePlanView(date) {
-    let arr = planData.filter(p => p.date === date);
-    if (!arr.length) { alert("当日暂无计划"); return; }
-    let map = {};
-    arr.forEach(i => {
-        let k = `${i.date}|${i.ip}|${i.planType}`;
-        if (!map[k]) map[k] = { ...i, memberList: [] };
-        map[k].memberList.push(...i.memberList);
-    });
-    openPlanDetail(Object.values(map)[0]);
+    let plans = planData.filter(p => p.date === date);
+    if (!plans.length) { alert("当日暂无计划"); return; }
+    // 如果有多个计划，显示第一个合并的详情
+    let firstPlan = plans[0];
+    let planKey = `${firstPlan.date}|${firstPlan.ip}|${firstPlan.planType}`;
+    openMergedPlanDetail(planKey);
 }
 
 function prevMonth() { showMonth--; if (showMonth < 0) { showMonth = 11; showYear--; } renderCalendar(); }
 function nextMonth() { showMonth++; if (showMonth > 11) { showMonth = 0; showYear++; } renderCalendar(); }
 
-// ========== 删除计划 ==========
+// ========== 删除整个计划 ==========
 async function delCurrentPlan() {
-    if (!confirm("确定删除？")) return;
-    planData = planData.filter(p => String(p.id) !== String(currentViewPlan.id));
-    await db.collection("plans").doc(String(currentViewPlan.id)).delete();
+    if (!confirm("确定删除整个计划吗？")) return;
+    let plans = planData.filter(p => `${p.date}|${p.ip}|${p.planType}` === currentMergedPlanKey);
+    for (let plan of plans) {
+        planData = planData.filter(p => p.id !== plan.id);
+        await db.collection("plans").doc(String(plan.id)).delete();
+    }
     closeDetailModal();
     renderCalendar();
     renderPlanList();
@@ -627,8 +640,7 @@ function openAddPlanModal() {
     document.getElementById("addressInput").value = "";
 }
 function closeAddModal() { document.getElementById("addPlanModal").classList.add("hidden"); }
-function closeMemberEdit() { document.getElementById("memberEditModal").classList.add("hidden"); }
-function closeDetailModal() { document.getElementById("detailModal").classList.add("hidden"); currentViewPlan = null; }
+function closeDetailModal() { document.getElementById("detailModal").classList.add("hidden"); currentMergedPlanKey = null; }
 
 // ========== 视图切换 ==========
 document.getElementById("tabCal")?.addEventListener("click", function() {
@@ -654,15 +666,14 @@ document.getElementById("tabList")?.addEventListener("click", function() {
 
 // ========== 实时监听 ==========
 function listenPlansRealtime() {
-    db.collection("plans").onSnapshot(snapshot => {
-        planData = [];
-        snapshot.forEach(doc => {
-            let data = doc.data();
-            data.id = doc.id;
-            planData.push(data);
-        });
+    db.collection("plans").onSnapshot(async snapshot => {
+        await loadPlansFromFirestore();
         renderCalendar();
         renderPlanList();
+        // 如果当前有打开的详情弹窗，刷新它
+        if (currentMergedPlanKey && document.getElementById("detailModal").classList.contains("hidden") === false) {
+            openMergedPlanDetail(currentMergedPlanKey);
+        }
     });
 }
 
@@ -670,7 +681,10 @@ function listenPlansRealtime() {
 initProvinceSelect();
 renderCalendar();
 renderPlanList();
-loadGlobalLists().then(() => {
+loadGlobalLists().then(async () => {
+    await loadPlansFromFirestore();
+    renderCalendar();
+    renderPlanList();
     listenPlansRealtime();
 });
 </script>
