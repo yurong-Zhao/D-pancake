@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>团队协同计划表 - 催办版</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyBv8MWTfNGWzk6hfUv9x_RyvnUsx6JG_ng",
+        authDomain: "d-pancake.firebaseapp.com",
+        projectId: "d-pancake",
+        storageBucket: "d-pancake.firebasestorage.app",
+        messagingSenderId: "102855872512",
+        appId: "1:102855872512:web:136247810838c84f2508e5"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    window.db = db;
+    window.firebaseReady = true;
+    console.log("Firebase 初始化成功");
+</script>
+
+<style>
+.calendar-day{min-height:60px;}
+.tag-dot{width:8px;height:8px;border-radius:50%;}
+.urge-btn{transition: all 0.1s ease;}
+.urge-btn:active{transform: scale(0.9);}
+</style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+<div class="max-w-7xl mx-auto p-4">
+    <div class="flex flex-wrap gap-3 items-center mb-6">
+        <button id="tabCal" class="px-5 py-2 rounded-lg bg-blue-500 text-white">日历视图</button>
+        <button id="tabList" class="px-5 py-2 rounded-lg bg-white border">计划列表</button>
+        <button onclick="openAddPlanModal()" class="ml-auto px-5 py-2 rounded-lg bg-emerald-500 text-white">新增计划</button>
+    </div>
+
+    <div id="viewCalendar" class="block">
+        <div class="flex justify-between items-center mb-3">
+            <button onclick="prevMonth()" class="px-3 py-1 bg-white rounded">←上月</button>
+            <h2 id="curMonthText" class="text-xl font-bold"></h2>
+            <button onclick="nextMonth()" class="px-3 py-1 bg-white rounded">下月→</button>
+        </div>
+        <div class="grid grid-cols-7 text-center font-semibold mb-2">
+            <span>周日</span><span>周一</span><span>周二</span><span>周三</span><span>周四</span><span>周五</span><span>周六</span>
+        </div>
+        <div id="calendarBox" class="grid grid-cols-7 gap-2"></div>
+    </div>
+
+    <div id="viewList" class="hidden space-y-4">
+        <div id="planListBox"></div>
+    </div>
+</div>
+
+<!-- 新增计划弹窗 -->
+<div id="addPlanModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-2">
+    <div class="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5">
+        <h3 class="text-lg font-bold mb-4">新建群组计划</h3>
+        <input type="hidden" id="editGroupId">
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm text-gray-600">选择日期</label>
+                <input type="date" id="planDateSel" class="w-full border rounded p-2 mt-1">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600">IP / 活动主题</label>
+                <div class="flex gap-2 mt-1">
+                    <select id="existIpSel" class="flex-1 border rounded p-2" onchange="autoFillAddressByIp()">
+                        <option value="">选择已有IP</option>
+                    </select>
+                    <input type="text" id="newIpInput" placeholder="输入新IP（自动保存）" class="flex-1 border rounded p-2">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600">活动性质</label>
+                <select id="planTypeSel" class="w-full border rounded p-2 mt-1">
+                    <option value="漫展">漫展</option>
+                    <option value="团建">团建</option>
+                    <option value="正片">正片</option>
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm text-gray-600">选择省份</label>
+                    <select id="provinceSel" class="w-full border rounded p-2 mt-1" onchange="changeProvince()">
+                        <option value="">请选择省份</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600">选择城市</label>
+                    <select id="citySel" class="w-full border rounded p-2 mt-1">
+                        <option value="">先选省份</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600">详细具体地址</label>
+                <input type="text" id="addressInput" placeholder="场馆/门店/详细地点" class="w-full border rounded p-2 mt-1">
+            </div>
+            <div>
+                <label class="block text-sm text-gray-600">选择参与成员（可多选）</label>
+                <div id="memberCheckBox" class="flex flex-wrap gap-2 border rounded p-2 min-h-[80px]"></div>
+                <div class="mt-2">
+                    <input type="text" id="newMemberInput" placeholder="输入新成员名字（自动保存）" class="w-full border rounded p-2">
+                </div>
+            </div>
+            <div id="memberInfoWrap" class="border p-3 rounded space-y-3">
+                <p class="text-sm text-gray-500">勾选成员后填写角色与状态</p>
+            </div>
+        </div>
+        <div class="flex justify-end gap-3 mt-6">
+            <button onclick="closeAddModal()" class="px-4 py-2 bg-gray-200 rounded">取消</button>
+            <button onclick="saveGroupPlan()" class="px-4 py-2 bg-blue-500 text-white">保存计划</button>
+        </div>
+    </div>
+</div>
+
+<!-- 成员单独编辑弹窗 -->
+<div id="memberEditModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-2">
+    <div class="bg-white rounded-xl w-full max-w-md p-5">
+        <h3 class="text-lg font-bold mb-4" id="editMemberName">编辑成员信息</h3>
+        <div class="space-y-3">
+            <div>
+                <label class="text-sm text-gray-600">快捷角色</label>
+                <select id="editQuickRole" class="w-full border rounded p-2 mt-1" onchange="switchEditRoleType()">
+                    <option value="">自定义角色</option>
+                    <option value="摄影">摄影</option>
+                    <option value="后勤">后勤</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-sm text-gray-600">扮演角色</label>
+                <input type="text" id="editRoleInput" class="w-full border rounded p-2 mt-2" placeholder="填写角色">
+            </div>
+        </div>
+        <div class="flex justify-end gap-3 mt-5">
+            <button onclick="closeMemberEdit()" class="px-4 py-2 bg-gray-200 rounded">取消</button>
+            <button onclick="saveMemberEdit()" class="px-4 py-2 bg-blue-500 text-white">保存修改</button>
+        </div>
+    </div>
+</div>
+
+<!-- 详情弹窗 -->
+<div id="detailModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 p-2">
+    <div class="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5">
+        <h3 class="text-lg font-bold mb-4" id="detailTitle"></h3>
+        <div class="text-sm mb-2">
+            <span class="text-gray-600">省市：</span><span id="showProvinceCity"></span>
+            <span class="ml-4 text-gray-600">详细地址：</span><span id="showAddress"></span>
+        </div>
+        <div id="detailContent" class="space-y-3"></div>
+        <div class="flex justify-end gap-3 mt-5">
+            <button onclick="delCurrentPlan()" class="px-4 py-2 bg-red-500 text-white">删除整条计划</button>
+            <button onclick="closeDetailModal()" class="px-4 py-2 bg-gray-200 rounded">关闭</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ========== 省市数据 ==========
+const areaData = {
+    "北京市":["北京市"],"天津市":["天津市"],"上海市":["上海市"],"重庆市":["重庆市"],
+    "河北省":["石家庄","唐山","秦皇岛","邯郸","邢台","保定","张家口","承德","沧州","廊坊","衡水"],
+    "山西省":["太原","大同","朔州","忻州","阳泉","吕梁","晋中","长治","晋城","临汾","运城"],
+    "辽宁省":["沈阳","大连","鞍山","抚顺","本溪","丹东","锦州","营口","阜新","辽阳","盘锦","铁岭","朝阳","葫芦岛"],
+    "吉林省":["长春","吉林","四平","辽源","通化","白山","松原","白城","延边"],
+    "黑龙江省":["哈尔滨","齐齐哈尔","鸡西","鹤岗","双鸭山","大庆","伊春","佳木斯","七台河","牡丹江","黑河","绥化","大兴安岭"],
+    "江苏省":["南京","无锡","徐州","常州","苏州","南通","连云港","淮安","盐城","扬州","镇江","泰州","宿迁"],
+    "浙江省":["杭州","宁波","温州","嘉兴","湖州","绍兴","金华","衢州","舟山","台州","丽水"],
+    "安徽省":["合肥","芜湖","蚌埠","淮南","马鞍山","淮北","铜陵","安庆","黄山","滁州","阜阳","宿州","六安","亳州","池州","宣城"],
+    "福建省":["福州","厦门","莆田","三明","泉州","漳州","南平","龙岩","宁德"],
+    "江西省":["南昌","景德镇","萍乡","九江","新余","鹰潭","赣州","吉安","宜春","抚州","上饶"],
+    "山东省":["济南","青岛","淄博","枣庄","东营","烟台","潍坊","济宁","泰安","威海","日照","临沂","德州","聊城","滨州","菏泽"],
+    "河南省":["郑州","开封","洛阳","平顶山","安阳","鹤壁","新乡","焦作","濮阳","许昌","漯河","三门峡","南阳","商丘","信阳","周口","驻马店"],
+    "湖北省":["武汉","黄石","十堰","宜昌","襄阳","鄂州","荆门","孝感","荆州","黄冈","咸宁","随州","恩施"],
+    "湖南省":["长沙","株洲","湘潭","衡阳","邵阳","岳阳","常德","张家界","益阳","郴州","永州","怀化","娄底","湘西"],
+    "广东省":["广州","深圳","珠海","汕头","佛山","韶关","湛江","肇庆","江门","茂名","惠州","梅州","汕尾","河源","阳江","清远","东莞","中山","潮州","揭阳","云浮"],
+    "海南省":["海口","三亚","三沙","儋州","五指山","文昌","琼海","万宁","东方","定安","屯昌","澄迈","临高","白沙","昌江","乐东","陵水","保亭","琼中"],
+    "四川省":["成都","自贡","攀枝花","泸州","德阳","绵阳","广元","遂宁","内江","乐山","南充","眉山","宜宾","广安","达州","雅安","巴中","资阳","阿坝","甘孜","凉山"],
+    "贵州省":["贵阳","六盘水","遵义","安顺","毕节","铜仁","黔东南","黔南","黔西南"],
+    "云南省":["昆明","曲靖","玉溪","保山","昭通","丽江","普洱","临沧","楚雄","红河","文山","西双版纳","大理","德宏","怒江","迪庆"],
+    "陕西省":["西安","铜川","宝鸡","咸阳","渭南","延安","汉中","榆林","安康","商洛"],
+    "甘肃省":["兰州","嘉峪关","金昌","白银","天水","武威","张掖","平凉","酒泉","庆阳","定西","陇南","临夏","甘南"],
+    "青海省":["西宁","海东","海北","黄南","海南","果洛","玉树","海西"],
+    "台湾省":["台北","新北","桃园","台中","台南","高雄","基隆","新竹","嘉义","新竹县","苗栗县","彰化县","南投县","云林县","嘉义县","屏东县","宜兰县","花莲县","台东县","澎湖县"],
+    "内蒙古":["呼和浩特","包头","乌海","赤峰","通辽","鄂尔多斯","呼伦贝尔","巴彦淖尔","乌兰察布","兴安盟","锡林郭勒","阿拉善"],
+    "广西":["南宁","柳州","桂林","梧州","北海","防城港","钦州","贵港","玉林","百色","贺州","河池","来宾","崇左"],
+    "西藏":["拉萨","日喀则","昌都","林芝","山南","那曲","阿里"],
+    "宁夏":["银川","石嘴山","吴忠","固原","中卫"],
+    "新疆":["乌鲁木齐","克拉玛依","吐鲁番","哈密","昌吉","博尔塔拉","巴音郭楞","阿克苏","克孜勒苏","喀什","和田","伊犁","塔城","阿勒泰"],
+    "香港特别行政区":["香港"],"澳门特别行政区":["澳门"]
+};
+
+// ========== 全局变量 ==========
+let planData = [];
+let globalIpList = [];
+let globalMemberList = ["章鱼肉","祈宫","小曼","夏熙"];
+let currentViewPlan = null;
+let editTargetMemberName = "";
+let showYear = new Date().getFullYear();
+let showMonth = new Date().getMonth();
+
+const selectRoleList = ["摄影","后勤"];
+const statusArr = ["未确定角色","无装备","仅有假发","仅有服饰道具","已准备齐全"];
+
+// ========== 初始化省份 ==========
+function initProvinceSelect() {
+    let pSel = document.getElementById("provinceSel");
+    pSel.innerHTML = '<option value="">请选择省份</option>';
+    Object.keys(areaData).forEach(p => {
+        pSel.innerHTML += `<option value="${p}">${p}</option>`;
+    });
+}
+
+function changeProvince() {
+    let p = document.getElementById("provinceSel").value;
+    let cSel = document.getElementById("citySel");
+    cSel.innerHTML = '<option value="">请选择城市</option>';
+    if (!p || !areaData[p]) return;
+    areaData[p].forEach(c => {
+        cSel.innerHTML += `<option value="${c}">${c}</option>`;
+    });
+}
+
+// ========== 加载全局数据 ==========
+async function loadGlobalLists() {
+    try {
+        // 加载IP列表
+        const ipSnapshot = await db.collection("global_ips").get();
+        if (!ipSnapshot.empty) {
+            globalIpList = [];
+            ipSnapshot.forEach(doc => globalIpList.push(doc.data().name));
+        } else {
+            globalIpList = [];
+            await db.collection("global_ips").doc("default").set({name:"默认IP"});
+            globalIpList.push("默认IP");
+        }
+        // 加载成员列表
+        const memberSnapshot = await db.collection("global_members").get();
+        if (!memberSnapshot.empty) {
+            globalMemberList = [];
+            memberSnapshot.forEach(doc => globalMemberList.push(doc.data().name));
+        } else {
+            for (let m of globalMemberList) {
+                await db.collection("global_members").doc(m).set({name:m});
+            }
+        }
+        refreshIpSelect();
+        refreshMemberCheck();
+    } catch(e) {
+        console.error("加载全局数据失败", e);
+    }
+}
+
+async function saveNewIp(ip) {
+    if (!ip || globalIpList.includes(ip)) return;
+    globalIpList.push(ip);
+    await db.collection("global_ips").doc(ip).set({name:ip});
+    refreshIpSelect();
+}
+
+async function saveNewMember(name) {
+    if (!name || globalMemberList.includes(name)) return;
+    globalMemberList.push(name);
+    await db.collection("global_members").doc(name).set({name:name});
+    refreshMemberCheck();
+}
+
+function refreshIpSelect() {
+    let sel = document.getElementById("existIpSel");
+    sel.innerHTML = '<option value="">选择已有IP</option>';
+    globalIpList.forEach(ip => {
+        sel.innerHTML += `<option value="${ip}">${ip}</option>`;
+    });
+}
+
+function refreshMemberCheck() {
+    let box = document.getElementById("memberCheckBox");
+    box.innerHTML = "";
+    globalMemberList.forEach(name => {
+        box.innerHTML += `<label class="flex items-center gap-1 border px-2 py-1 rounded cursor-pointer"><input type="checkbox" value="${name}" onchange="changeMemberSelect()"> ${name}</label>`;
+    });
+}
+
+// 监听新IP输入
+document.getElementById("newIpInput")?.addEventListener("blur", function() {
+    let val = this.value.trim();
+    if (val) saveNewIp(val);
+});
+document.getElementById("newMemberInput")?.addEventListener("blur", function() {
+    let val = this.value.trim();
+    if (val) saveNewMember(val);
+});
+
+function autoFillAddressByIp() {
+    let date = document.getElementById("planDateSel").value;
+    let selIp = document.getElementById("existIpSel").value;
+    if (!selIp) return;
+    let sameIpInfo = planData.find(item => item.date === date && item.ip === selIp);
+    if (!sameIpInfo) return;
+    document.getElementById("provinceSel").value = sameIpInfo.province || "";
+    changeProvince();
+    setTimeout(() => {
+        document.getElementById("citySel").value = sameIpInfo.city || "";
+    }, 50);
+    document.getElementById("addressInput").value = sameIpInfo.address || "";
+}
+
+function changeMemberSelect() {
+    let checks = document.querySelectorAll("#memberCheckBox input:checked");
+    let wrap = document.getElementById("memberInfoWrap");
+    let html = '<p class="text-sm text-gray-500">勾选成员后填写角色与状态</p>';
+    checks.forEach(cb => {
+        let uname = cb.value;
+        html += `
+        <div class="border-t pt-2 mt-2">
+            <p class="font-medium">${uname}</p>
+            <div class="grid grid-cols-2 gap-2 mt-1">
+                <div>
+                    <select class="pre-role border rounded p-1 w-full" data-name="${uname}">
+                        <option value="">自定义角色</option>
+                        ${selectRoleList.map(r => `<option value="${r}">${r}</option>`).join("")}
+                    </select>
+                    <input type="text" class="mem-role border rounded p-1 w-full mt-1" data-name="${uname}" placeholder="自定义扮演角色">
+                </div>
+                <select class="mem-status border rounded p-1 w-full" data-name="${uname}">
+                    ${statusArr.map(s => `<option value="${s}">${s}</option>`).join("")}
+                </select>
+            </div>
+        </div>`;
+    });
+    wrap.innerHTML = html;
+    document.querySelectorAll(".pre-role").forEach(s => {
+        s.onchange = function() {
+            let n = this.dataset.name, v = this.value;
+            let st = document.querySelector(`.mem-status[data-name="${n}"]`);
+            let inp = document.querySelector(`.mem-role[data-name="${n}"]`);
+            if (selectRoleList.includes(v)) {
+                st.style.display = "none";
+                inp.value = v;
+                inp.disabled = true;
+            } else {
+                st.style.display = "block";
+                inp.disabled = false;
+            }
+        };
+    });
+}
+
+// ========== 催促功能 ==========
+async function addUrge(planId, memberName) {
+    let plan = planData.find(p => String(p.id) === String(planId));
+    if (!plan) return;
+    let member = plan.memberList.find(m => m.userName === memberName);
+    if (!member) return;
+    if (member.userStatus === "已准备齐全") {
+        alert("该成员已准备齐全，无法催促");
+        return;
+    }
+    member.urgeCount = (member.urgeCount || 0) + 1;
+    if (member.urgeCount > 10) member.urgeCount = 10;
+    await syncSinglePlanToFirestore(plan);
+    renderPlanList();
+    renderCalendar();
+}
+
+function getUrgeIcons(count) {
+    if (!count || count === 0) return "无催促";
+    let icons = "";
+    for (let i = 0; i < Math.min(count, 10); i++) icons += "🔥";
+    return icons;
+}
+
+async function changeMemberStatusInList(planId, memberName, newStatus) {
+    let plan = planData.find(p => String(p.id) === String(planId));
+    if (!plan) return;
+    let member = plan.memberList.find(m => m.userName === memberName);
+    if (!member) return;
+    member.userStatus = newStatus;
+    if (newStatus === "已准备齐全") {
+        member.urgeCount = 0;
+    }
+    await syncSinglePlanToFirestore(plan);
+    renderPlanList();
+    renderCalendar();
+}
+
+async function syncSinglePlanToFirestore(plan) {
+    const planRef = db.collection("plans").doc(String(plan.id));
+    const { id, ...data } = plan;
+    await planRef.set(data);
+}
+
+// ========== 渲染计划列表 ==========
+function renderPlanList() {
+    let box = document.getElementById("planListBox");
+    if (!box) return;
+    box.innerHTML = "";
+    if (planData.length === 0) {
+        box.innerHTML = '<div class="text-center py-10 text-gray-500">暂无计划</div>';
+        return;
+    }
+    planData.sort((a,b) => (a.date || "").localeCompare(b.date || "")).forEach(plan => {
+        let planDiv = document.createElement("div");
+        planDiv.className = "bg-white p-4 rounded-lg border mb-3";
+        planDiv.innerHTML = `
+            <div class="font-medium mb-2">📅 ${plan.date || "无日期"} | ${plan.ip || ""} | ${plan.planType || ""}</div>
+            <div class="text-sm text-gray-600 mb-2">📍 ${plan.province || ""}${plan.city || ""} ${plan.address || ""}</div>
+            <div class="space-y-2">
+                ${plan.memberList && plan.memberList.map(m => `
+                    <div class="flex flex-wrap items-center gap-2 border-t pt-2">
+                        <span class="font-medium w-20">${m.userName}</span>
+                        <span class="text-xs bg-gray-100 px-2 py-0.5 rounded">${m.userRole || "未填"}</span>
+                        <span class="text-sm">${getUrgeIcons(m.urgeCount || 0)}</span>
+                        <button class="urge-btn px-2 py-0.5 bg-orange-400 text-white rounded text-xs" onclick="addUrge('${plan.id}', '${m.userName}')">➕🔥</button>
+                        <select class="status-select border rounded text-xs p-1" data-planid="${plan.id}" data-member="${m.userName}">
+                            ${statusArr.map(s => `<option value="${s}" ${(m.userStatus === s) ? "selected" : ""}>${s}</option>`).join("")}
+                        </select>
+                        <button class="text-blue-500 text-xs underline" onclick="openPlanDetailForEdit('${plan.id}', '${m.userName}')">编辑角色</button>
+                    </div>
+                `).join("")}
+            </div>
+        `;
+        box.appendChild(planDiv);
+    });
+    document.querySelectorAll(".status-select").forEach(sel => {
+        sel.addEventListener("change", function() {
+            let planId = this.dataset.planid;
+            let memberName = this.dataset.member;
+            changeMemberStatusInList(planId, memberName, this.value);
+        });
+    });
+}
+
+function openPlanDetailForEdit(planId, memberName) {
+    let plan = planData.find(p => String(p.id) === String(planId));
+    if (plan) {
+        currentViewPlan = plan;
+        editTargetMemberName = memberName;
+        let member = plan.memberList.find(m => m.userName === memberName);
+        if (member) {
+            document.getElementById("editMemberName").innerText = `编辑${memberName}信息`;
+            document.getElementById("editQuickRole").value = selectRoleList.includes(member.userRole) ? member.userRole : "";
+            document.getElementById("editRoleInput").value = member.userRole || "";
+            switchEditRoleType();
+            document.getElementById("memberEditModal").classList.remove("hidden");
+        }
+    }
+}
+
+function openPlanDetail(data) {
+    currentViewPlan = data;
+    document.getElementById("detailTitle").innerText = `${data.date} ${data.ip} ${data.planType} 详情`;
+    document.getElementById("showProvinceCity").innerText = `${data.province || ""}${data.city || ""}` || "未填写";
+    document.getElementById("showAddress").innerText = data.address || "无";
+    let html = "";
+    data.memberList.forEach(m => {
+        html += `
+        <div class="border p-3 rounded flex justify-between items-start">
+            <div>
+                <p><b>成员：</b>${m.userName}</p>
+                <p><b>扮演角色：</b>${m.userRole}</p>
+                <p><b>准备状态：</b>${m.userStatus}</p>
+                <p><b>🔥 催促次数：</b>${m.urgeCount || 0}</p>
+            </div>
+            <button class="edit-item-btn bg-amber-400 text-white px-2 py-1 rounded" onclick="openSingleMemberEdit('${m.userName}')">编辑此成员</button>
+        </div>`;
+    });
+    document.getElementById("detailContent").innerHTML = html;
+    document.getElementById("detailModal").classList.remove("hidden");
+}
+
+function openSingleMemberEdit(name) {
+    editTargetMemberName = name;
+    let m = currentViewPlan.memberList.find(x => x.userName === name);
+    if (!m) return;
+    document.getElementById("editMemberName").innerText = `编辑${name}信息`;
+    document.getElementById("editQuickRole").value = selectRoleList.includes(m.userRole) ? m.userRole : "";
+    document.getElementById("editRoleInput").value = m.userRole || "";
+    switchEditRoleType();
+    document.getElementById("memberEditModal").classList.remove("hidden");
+}
+
+function switchEditRoleType() {
+    let v = document.getElementById("editQuickRole").value;
+    let inp = document.getElementById("editRoleInput");
+    if (selectRoleList.includes(v)) {
+        inp.value = v;
+        inp.disabled = true;
+    } else {
+        inp.disabled = false;
+    }
+}
+
+async function saveMemberEdit() {
+    let r = document.getElementById("editRoleInput").value.trim();
+    if (!r) { alert("角色不能为空"); return; }
+    let idx = currentViewPlan.memberList.findIndex(x => x.userName === editTargetMemberName);
+    if (idx > -1) {
+        currentViewPlan.memberList[idx].userRole = r;
+        if (selectRoleList.includes(r) && currentViewPlan.memberList[idx].userStatus !== "已准备齐全") {
+            currentViewPlan.memberList[idx].userStatus = "无需准备状态";
+        }
+    }
+    let mainIdx = planData.findIndex(p => String(p.id) === String(currentViewPlan.id));
+    if (mainIdx > -1) planData[mainIdx].memberList = currentViewPlan.memberList;
+    await syncSinglePlanToFirestore(currentViewPlan);
+    closeMemberEdit();
+    renderPlanList();
+    alert("修改完成");
+}
+
+// ========== 保存计划 ==========
+async function saveGroupPlan() {
+    let date = document.getElementById("planDateSel").value;
+    let selIp = document.getElementById("existIpSel").value;
+    let newIp = document.getElementById("newIpInput").value.trim();
+    let ipName = selIp || newIp;
+    if (!date || !ipName) { alert("请选择日期并填写IP"); return; }
+    if (newIp) await saveNewIp(newIp);
+    
+    let type = document.getElementById("planTypeSel").value;
+    let province = document.getElementById("provinceSel").value;
+    let city = document.getElementById("citySel").value;
+    let address = document.getElementById("addressInput").value.trim();
+    
+    let memberArr = [];
+    document.querySelectorAll(".mem-role").forEach(ri => {
+        let un = ri.dataset.name;
+        let ro = ri.value.trim();
+        if (!ro) ro = "待定";
+        let st = document.querySelector(`.mem-status[data-name="${un}"]`)?.value || "未确定角色";
+        memberArr.push({ userName: un, userRole: ro, userStatus: st, urgeCount: 0 });
+    });
+    if (memberArr.length === 0) { alert("请勾选成员"); return; }
+    
+    let newPlan = {
+        id: Date.now(),
+        date, ip: ipName, planType: type,
+        province, city, address,
+        memberList: memberArr
+    };
+    planData.push(newPlan);
+    await db.collection("plans").doc(String(newPlan.id)).set(newPlan);
+    closeAddModal();
+    renderCalendar();
+    renderPlanList();
+    alert("保存成功");
+}
+
+// ========== 日历渲染 ==========
+function renderCalendar() {
+    let monthText = document.getElementById("curMonthText");
+    if (monthText) monthText.innerText = `${showYear}年${showMonth+1}月`;
+    let firstDay = new Date(showYear, showMonth, 1).getDay();
+    let totalDay = new Date(showYear, showMonth+1, 0).getDate();
+    let box = document.getElementById("calendarBox");
+    if (!box) return;
+    box.innerHTML = "";
+    for (let i = 0; i < firstDay; i++) {
+        box.innerHTML += `<div class="calendar-day bg-gray-50 rounded p-2"></div>`;
+    }
+    for (let d = 1; d <= totalDay; d++) {
+        let dateStr = `${showYear}-${String(showMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        let dayPlans = planData.filter(p => p.date === dateStr);
+        let hasPlan = dayPlans.length > 0;
+        let planIcons = "";
+        if (hasPlan) {
+            let allUrgeCount = 0;
+            dayPlans.forEach(p => {
+                if (p.memberList) {
+                    p.memberList.forEach(m => { allUrgeCount += (m.urgeCount || 0); });
+                }
+            });
+            planIcons = allUrgeCount > 0 ? `<span class="text-xs">🔥${allUrgeCount}</span>` : `<span class="tag-dot bg-blue-500 inline-block"></span>`;
+        }
+        box.innerHTML += `
+        <div class="calendar-day bg-white border rounded p-2 cursor-pointer hover:border-blue-400" onclick="openDatePlanView('${dateStr}')">
+            <div class="font-medium">${d}</div>
+            ${hasPlan ? `<div class="flex gap-1 mt-1">${planIcons}</div>` : ""}
+        </div>`;
+    }
+}
+
+function openDatePlanView(date) {
+    let arr = planData.filter(p => p.date === date);
+    if (!arr.length) { alert("当日暂无计划"); return; }
+    let map = {};
+    arr.forEach(i => {
+        let k = `${i.date}|${i.ip}|${i.planType}`;
+        if (!map[k]) map[k] = { ...i, memberList: [] };
+        map[k].memberList.push(...i.memberList);
+    });
+    openPlanDetail(Object.values(map)[0]);
+}
+
+function prevMonth() { showMonth--; if (showMonth < 0) { showMonth = 11; showYear--; } renderCalendar(); }
+function nextMonth() { showMonth++; if (showMonth > 11) { showMonth = 0; showYear++; } renderCalendar(); }
+
+// ========== 删除计划 ==========
+async function delCurrentPlan() {
+    if (!confirm("确定删除？")) return;
+    planData = planData.filter(p => String(p.id) !== String(currentViewPlan.id));
+    await db.collection("plans").doc(String(currentViewPlan.id)).delete();
+    closeDetailModal();
+    renderCalendar();
+    renderPlanList();
+    alert("删除成功");
+}
+
+// ========== 弹窗控制 ==========
+function openAddPlanModal() {
+    document.getElementById("addPlanModal").classList.remove("hidden");
+    document.getElementById("editGroupId").value = "";
+    document.getElementById("planDateSel").value = new Date().toISOString().split("T")[0];
+    document.getElementById("newIpInput").value = "";
+    document.getElementById("newMemberInput").value = "";
+    refreshMemberCheck();
+    document.getElementById("memberInfoWrap").innerHTML = '<p class="text-sm text-gray-500">勾选成员后填写角色与状态</p>';
+    document.getElementById("provinceSel").value = "";
+    document.getElementById("citySel").innerHTML = '<option value="">先选省份</option>';
+    document.getElementById("addressInput").value = "";
+}
+function closeAddModal() { document.getElementById("addPlanModal").classList.add("hidden"); }
+function closeMemberEdit() { document.getElementById("memberEditModal").classList.add("hidden"); }
+function closeDetailModal() { document.getElementById("detailModal").classList.add("hidden"); currentViewPlan = null; }
+
+// ========== 视图切换 ==========
+document.getElementById("tabCal")?.addEventListener("click", function() {
+    document.getElementById("viewCalendar").classList.remove("hidden");
+    document.getElementById("viewList").classList.add("hidden");
+    this.classList.add("bg-blue-500","text-white");
+    this.classList.remove("bg-white","border");
+    let listBtn = document.getElementById("tabList");
+    listBtn.classList.remove("bg-blue-500","text-white");
+    listBtn.classList.add("bg-white","border");
+    renderCalendar();
+});
+document.getElementById("tabList")?.addEventListener("click", function() {
+    document.getElementById("viewList").classList.remove("hidden");
+    document.getElementById("viewCalendar").classList.add("hidden");
+    this.classList.add("bg-blue-500","text-white");
+    this.classList.remove("bg-white","border");
+    let calBtn = document.getElementById("tabCal");
+    calBtn.classList.remove("bg-blue-500","text-white");
+    calBtn.classList.add("bg-white","border");
+    renderPlanList();
+});
+
+// ========== 实时监听 ==========
+function listenPlansRealtime() {
+    db.collection("plans").onSnapshot(snapshot => {
+        planData = [];
+        snapshot.forEach(doc => {
+            let data = doc.data();
+            data.id = doc.id;
+            planData.push(data);
+        });
+        renderCalendar();
+        renderPlanList();
+    });
+}
+
+// ========== 启动 ==========
+initProvinceSelect();
+renderCalendar();
+renderPlanList();
+loadGlobalLists().then(() => {
+    listenPlansRealtime();
+});
+</script>
+</body>
+</html>
