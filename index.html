@@ -39,6 +39,7 @@
     <div class="flex flex-wrap gap-3 items-center mb-6">
         <button id="tabCal" class="px-5 py-2 rounded-lg bg-blue-500 text-white">日历视图</button>
         <button id="tabList" class="px-5 py-2 rounded-lg bg-white border">计划列表</button>
+        <button onclick="location.reload()" class="px-5 py-2 rounded-lg bg-gray-500 text-white">🔄 刷新</button>
         <button onclick="openAddPlanModal()" class="ml-auto px-5 py-2 rounded-lg bg-emerald-500 text-white">新增计划</button>
     </div>
 
@@ -686,18 +687,6 @@ loadGlobalLists().then(async () => {
     renderCalendar();
     renderPlanList();
     listenPlansRealtime();
-});
-</script>
-    <script>
-// 强制检查保存按钮是否正常
-window.addEventListener('DOMContentLoaded', function() {
-    var btn = document.querySelector('button[onclick="saveGroupPlan()"]');
-    if (btn) {
-        console.log('保存按钮已找到');
-        btn.style.border = '2px solid red';  // 加红边让你肉眼看到
-    } else {
-        alert('保存按钮未找到，请检查代码');
-    }
 });
 </script>
 </body>
