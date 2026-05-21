@@ -688,5 +688,17 @@ loadGlobalLists().then(async () => {
     listenPlansRealtime();
 });
 </script>
+    <script>
+// 强制检查保存按钮是否正常
+window.addEventListener('DOMContentLoaded', function() {
+    var btn = document.querySelector('button[onclick="saveGroupPlan()"]');
+    if (btn) {
+        console.log('保存按钮已找到');
+        btn.style.border = '2px solid red';  // 加红边让你肉眼看到
+    } else {
+        alert('保存按钮未找到，请检查代码');
+    }
+});
+</script>
 </body>
 </html>
